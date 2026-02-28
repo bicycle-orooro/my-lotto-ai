@@ -43,6 +43,40 @@ def inject_ga(tracking_id):
     # 보이지 않는 투명 상자에서 스크립트를 딱 한 번 실행시킵니다.
     components.html(ga_js, width=0, height=0)
 
+ # ==========================================
+# 🔎 SEO 및 카카오톡 공유 썸네일 (Meta Tag 주입)
+# ==========================================
+def inject_seo():
+    seo_js = """
+    <script>
+        var parentDoc = window.parent.document;
+        
+        // 메타 태그를 생성하거나 업데이트하는 함수
+        function setMeta(attrName, attrValue, content) {
+            var el = parentDoc.querySelector(`meta[${attrName}="${attrValue}"]`);
+            if (!el) {
+                el = parentDoc.createElement('meta');
+                el.setAttribute(attrName, attrValue);
+                parentDoc.head.appendChild(el);
+            }
+            el.setAttribute('content', content);
+        }
+
+        // 1. 구글/네이버 검색 봇이 읽어갈 웹사이트 설명과 키워드
+        setMeta('name', 'description', '역대 로또 당첨 빅데이터와 최근 흐름을 분석하여 최적의 로또 번호를 추천하는 AI 예측 서비스입니다.');
+        setMeta('name', 'keywords', '로또, 로또예측, 로또당첨번호, AI로또, 로또추천, 무료로또번호, 동행복권');
+        
+        // 2. 카카오톡/페이스북 등에 링크 공유 시 예쁘게 뜨는 미리보기(Open Graph) 명함
+        setMeta('property', 'og:title', '🎲 AI 로또 번호 예측기');
+        setMeta('property', 'og:description', '나만의 AI 로또 번호를 무료로 뽑아보세요! 최근 트렌드 완벽 반영.');
+        setMeta('property', 'og:type', 'website');
+        
+        // (선택) 여기에 나중에 썸네일 이미지 주소를 넣으면 카톡 공유 시 사진도 뜹니다!
+        // setMeta('property', 'og:image', 'https://이미지주소.jpg'); 
+    </script>
+    """
+    components.html(seo_js, width=0, height=0)   
+
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
 # ==========================================
@@ -145,10 +179,15 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
 # ==========================================
 # 🖥️ 웹 UI 구성 (Streamlit)
 # ==========================================
-st.set_page_config(page_title="AI 로또 예측기", page_icon="🎲")
+# 1. 페이지 탭 이름 설정
+st.set_page_config(page_title="AI 로또 예측기 | 무료 번호 추천", page_icon="🎲")
 
 # 🚀 본인의 측정 ID를 다시 넣어주세요!
+# 2. 구글 애널리틱스 실행
 inject_ga("G-X29DQR6BSL")
+
+# 3. 🚀 SEO 명함 강제 주입 실행!
+inject_seo()
 
 apply_mobile_layout()
 
