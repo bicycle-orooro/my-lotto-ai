@@ -24,7 +24,7 @@ def add_google_analytics(tracking_id):
     </script>
     """
     # Streamlit 앱에 보이지 않는 iframe 형태로 GA 코드를 삽입하여 방문자를 추적합니다.
-    components.html(ga_code, width=0, height=0)
+    components.html(ga_code, width=1, height=1)
 
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
@@ -189,3 +189,4 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
+
