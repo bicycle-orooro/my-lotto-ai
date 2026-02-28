@@ -176,7 +176,7 @@ if not df.empty:
                     share_text += f"세트 {i+1} : {', '.join(map(str, num_set))}\n"
                 
                 # ⚠️ 아래 주소를 본인이 스트림릿에서 발급받은 실제 주소로 바꿔주세요!
-                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://[나의-스트림릿-주소].streamlit.app"
+                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://lotto-ai-pro.streamlit.app"
                 
                 st.write("---")
                 st.write("📲 **번호 공유하기 (복사해서 붙여넣기)**")
