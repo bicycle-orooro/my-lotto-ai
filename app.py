@@ -2,8 +2,29 @@ import pandas as pd
 import streamlit as st
 import random
 import os
+import streamlit.components.v1 as components # 구글 애널리틱스를 위한 컴포넌트 추가
 
 CSV_FILE = "lotto_data.csv"
+
+# ==========================================
+# 📈 구글 애널리틱스 (Google Analytics) 추적 코드
+# ==========================================
+def add_google_analytics(tracking_id):
+    # 만약 tracking_id가 기본값이면 작동하지 않음
+    if tracking_id == "G-X29DQR6BSL":
+        return
+        
+    ga_code = f"""
+    <script async src="https://www.googletagmanager.com/gtag/js?id={tracking_id}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      gtag('config', '{tracking_id}');
+    </script>
+    """
+    # Streamlit 앱에 보이지 않는 iframe 형태로 GA 코드를 삽입하여 방문자를 추적합니다.
+    components.html(ga_code, width=0, height=0)
 
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
@@ -84,17 +105,16 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
         if num in recent_counts:
             weights[num] += recent_counts[num] * 0.5
             
-        # ⚠️ 핵심 기능: 사용자가 입력한 고정수와 제외수 통제
         if num in excluded_nums:
-            weights[num] = 0.0  # 제외수는 가중치를 0으로 만들어 절대 뽑히지 않게 함
+            weights[num] = 0.0  
         if num in fixed_nums:
-            weights[num] = 0.0  # 고정수는 이미 뽑힌 것으로 간주하여 중복 추출 방지
+            weights[num] = 0.0  
 
     weight_list = [weights[i] for i in range(1, 46)]
     
     generated_sets = []
     for _ in range(num_sets):
-        selected = fixed_nums.copy() # 고정수를 먼저 바구니에 담고 시작
+        selected = fixed_nums.copy() 
         
         while len(selected) < 6:
             pick = random.choices(range(1, 46), weights=weight_list, k=1)[0]
@@ -109,6 +129,10 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
 # 🖥️ 웹 UI 구성 (Streamlit)
 # ==========================================
 st.set_page_config(page_title="AI 로또 예측기", page_icon="🎲")
+
+# 🚀 구글 애널리틱스 실행 (본인의 추적 ID로 변경하세요!)
+add_google_analytics("G-XXXXXXXXXX")
+
 apply_mobile_layout()
 
 st.title("🎲 AI 로또 예측 앱")
@@ -118,21 +142,20 @@ df = load_data()
 
 if not df.empty:
     latest_draw = df['draw_no'].iloc[0]
-    st.info(f"✅ **{latest_draw}회차**까지 과거 데이터 학습 완료")
+    next_draw = latest_draw + 1 # 🎯 핵심: 다음 회차 계산
     
-    # 🎯 1. 고정수 / 제외수 지정 기능 (토글로 접었다 폈다 할 수 있게 만듦)
+    st.info(f"✅ **{latest_draw}회차** 데이터 학습 완료 (다음 추첨: **{next_draw}회차**)")
+    
     with st.expander("🛠️ 나만의 번호 설정 (고정수/제외수)"):
         all_numbers = list(range(1, 46))
         
         fixed_nums = st.multiselect("📌 무조건 포함할 번호 (고정수, 최대 5개)", all_numbers, max_selections=5)
         excluded_nums = st.multiselect("❌ 절대 안 나올 번호 (제외수)", all_numbers)
         
-        # 에러 방지: 고정수와 제외수에 같은 번호를 넣는 실수 방지
         intersect = set(fixed_nums) & set(excluded_nums)
         if intersect:
             st.error(f"⚠️ 고정수와 제외수에 같은 번호({', '.join(map(str, intersect))})가 있습니다! 하나는 빼주세요.")
 
-    # 🎯 2. AI 번호 추출 버튼 (5세트로 변경)
     if st.button("✨ AI 번호 5세트 생성하기", type="primary", use_container_width=True):
         if intersect:
             st.warning("고정수와 제외수 충돌을 먼저 해결해 주세요!")
@@ -142,23 +165,20 @@ if not df.empty:
                 
                 st.subheader("🎯 AI 추천 번호")
                 
-                # 🎯 3. 공유하기용 텍스트 생성 준비
-                share_text = f"🤖 AI 로또 추천 번호 ({latest_draw}회차)\n\n"
+                # 🎯 핵심: 공유하기 텍스트에 +1 된 다음 회차 반영!
+                share_text = f"🤖 AI 로또 추천 번호 ({next_draw}회차)\n\n"
                 
                 for i, num_set in enumerate(ai_sets):
                     st.caption(f"**추천 세트 {i+1}**")
                     balls_html = "".join([get_lotto_ball_html(num) for num in num_set])
                     st.markdown(f'<div style="margin-bottom: 15px;">{balls_html}</div>', unsafe_allow_html=True)
                     
-                    # 공유하기 텍스트에 한 줄씩 추가
                     share_text += f"세트 {i+1} : {', '.join(map(str, num_set))}\n"
                 
-                # 안내 문구 (여기에 나중에 발급받은 Streamlit URL을 넣으시면 됩니다)
-                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://lotto-ai-pro.streamlit.app"
+                # ⚠️ 아래 주소를 본인이 스트림릿에서 발급받은 실제 주소로 바꿔주세요!
+                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://[나의-스트림릿-주소].streamlit.app"
                 
                 st.write("---")
-                
-                # 🎯 4. 카카오톡 공유하기 박스 (우측 상단 복사 아이콘 제공)
                 st.write("📲 **번호 공유하기 (복사해서 붙여넣기)**")
                 st.caption("아래 박스 오른쪽 위의 📋(복사) 버튼을 눌러 카카오톡에 바로 붙여넣어 보세요!")
                 st.code(share_text, language="text")
@@ -169,4 +189,3 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
-
