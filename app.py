@@ -24,7 +24,7 @@ def add_google_analytics(tracking_id):
     </script>
     """
     # Streamlit 앱에 보이지 않는 iframe 형태로 GA 코드를 삽입하여 방문자를 추적합니다.
-    components.html(ga_code, width=1, height=1)
+    components.html(ga_code, width=0, height=0)
 
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
@@ -131,7 +131,7 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
 st.set_page_config(page_title="AI 로또 예측기", page_icon="🎲")
 
 # 🚀 구글 애널리틱스 실행 (본인의 추적 ID로 변경하세요!)
-add_google_analytics("G-XXXXXXXXXX")
+add_google_analytics("G-X29DQR6BSL")
 
 apply_mobile_layout()
 
@@ -189,4 +189,3 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
-
