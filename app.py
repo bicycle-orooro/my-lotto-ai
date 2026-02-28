@@ -2,29 +2,41 @@ import pandas as pd
 import streamlit as st
 import random
 import os
-import streamlit.components.v1 as components # 구글 애널리틱스를 위한 컴포넌트 추가
+import pathlib # 🎯 파일 경로를 찾기 위한 모듈 추가
 
 CSV_FILE = "lotto_data.csv"
 
 # ==========================================
-# 📈 구글 애널리틱스 (Google Analytics) 추적 코드
+# 📈 구글 애널리틱스 (코어 HTML 직접 수정 기법)
 # ==========================================
-def add_google_analytics(tracking_id):
-    # 만약 tracking_id가 기본값이면 작동하지 않음
+def inject_ga(tracking_id):
     if tracking_id == "G-XXXXXXXXXX":
         return
         
-    ga_code = f"""
-    <script async src="https://www.googletagmanager.com/gtag/js?id={tracking_id}"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){{dataLayer.push(arguments);}}
-      gtag('js', new Date());
-      gtag('config', '{tracking_id}');
-    </script>
-    """
-    # Streamlit 앱에 보이지 않는 iframe 형태로 GA 코드를 삽입하여 방문자를 추적합니다.
-    components.html(ga_code, width=0, height=0)
+    # 1. 스트림릿 서버 깊숙한 곳에 있는 진짜 'index.html' 파일의 위치를 찾아냅니다.
+    index_path = pathlib.Path(st.__file__).parent / "static" / "index.html"
+    
+    # 2. 원본 파일을 읽어옵니다.
+    with open(index_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+        
+    # 3. 만약 내 G-코드가 아직 안 심어져 있다면 (서버가 처음 켜졌을 때만 작동)
+    if tracking_id not in html_content:
+        ga_script = f"""
+        <script async src="https://www.googletagmanager.com/gtag/js?id={tracking_id}"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){{dataLayer.push(arguments);}}
+          gtag('js', new Date());
+          gtag('config', '{tracking_id}');
+        </script>
+        """
+        # 4. 원본 HTML의 <head> 태그 바로 밑에 구글 코드를 강제로 욱여넣습니다.
+        new_html = html_content.replace("<head>", f"<head>\n{ga_script}")
+        
+        # 5. 수정한 내용으로 원본 파일을 완전히 덮어씁니다!
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(new_html)
 
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
@@ -130,8 +142,8 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
 # ==========================================
 st.set_page_config(page_title="AI 로또 예측기", page_icon="🎲")
 
-# 🚀 구글 애널리틱스 실행 (본인의 추적 ID로 변경하세요!)
-add_google_analytics("G-X29DQR6BSL")
+# 🚀 기존 코드를 지우고, 새로 만든 해킹 함수로 변경합니다!
+inject_ga("G-X29DQR6BSL")
 
 apply_mobile_layout()
 
@@ -189,4 +201,3 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
-
