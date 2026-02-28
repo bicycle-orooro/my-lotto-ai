@@ -11,7 +11,7 @@ CSV_FILE = "lotto_data.csv"
 # ==========================================
 def add_google_analytics(tracking_id):
     # 만약 tracking_id가 기본값이면 작동하지 않음
-    if tracking_id == "G-X29DQR6BSL":
+    if tracking_id == "G-XXXXXXXXXX":
         return
         
     ga_code = f"""
@@ -189,3 +189,4 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
+
