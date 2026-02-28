@@ -154,7 +154,7 @@ if not df.empty:
                     share_text += f"세트 {i+1} : {', '.join(map(str, num_set))}\n"
                 
                 # 안내 문구 (여기에 나중에 발급받은 Streamlit URL을 넣으시면 됩니다)
-                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://[나의-스트림릿-주소].streamlit.app"
+                share_text += "\n지금 무료로 나만의 AI 번호를 뽑아보세요!\n👉 https://lotto-ai-pro.streamlit.app"
                 
                 st.write("---")
                 
@@ -169,3 +169,4 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
+
