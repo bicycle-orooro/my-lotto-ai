@@ -2,41 +2,46 @@ import pandas as pd
 import streamlit as st
 import random
 import os
-import pathlib # 🎯 파일 경로를 찾기 위한 모듈 추가
+import streamlit.components.v1 as components # 다시 컴포넌트를 부릅니다!
 
 CSV_FILE = "lotto_data.csv"
 
 # ==========================================
-# 📈 구글 애널리틱스 (코어 HTML 직접 수정 기법)
+# 📈 구글 애널리틱스 (Iframe 탈출 DOM 주입 기법)
 # ==========================================
 def inject_ga(tracking_id):
     if tracking_id == "G-XXXXXXXXXX":
         return
         
-    # 1. 스트림릿 서버 깊숙한 곳에 있는 진짜 'index.html' 파일의 위치를 찾아냅니다.
-    index_path = pathlib.Path(st.__file__).parent / "static" / "index.html"
-    
-    # 2. 원본 파일을 읽어옵니다.
-    with open(index_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        
-    # 3. 만약 내 G-코드가 아직 안 심어져 있다면 (서버가 처음 켜졌을 때만 작동)
-    if tracking_id not in html_content:
-        ga_script = f"""
-        <script async src="https://www.googletagmanager.com/gtag/js?id={tracking_id}"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){{dataLayer.push(arguments);}}
-          gtag('js', new Date());
-          gtag('config', '{tracking_id}');
-        </script>
-        """
-        # 4. 원본 HTML의 <head> 태그 바로 밑에 구글 코드를 강제로 욱여넣습니다.
-        new_html = html_content.replace("<head>", f"<head>\n{ga_script}")
-        
-        # 5. 수정한 내용으로 원본 파일을 완전히 덮어씁니다!
-        with open(index_path, "w", encoding="utf-8") as f:
-            f.write(new_html)
+    # 🚀 자바스크립트가 투명 상자(iframe) 안에서 실행되지만, 
+    # window.parent.document를 호출하여 진짜 최상단 부모 화면의 <head>로 탈출해 코드를 심습니다!
+    ga_js = f"""
+    <script>
+        var parentDoc = window.parent.document;
+        // 이미 구글 코드가 심어져 있는지 확인 (중복 실행 방지)
+        if (!parentDoc.getElementById("ga-script")) {{
+            
+            // 1. 구글 애널리틱스 외부 스크립트 로드
+            var gaScript = parentDoc.createElement("script");
+            gaScript.id = "ga-script";
+            gaScript.async = true;
+            gaScript.src = "https://www.googletagmanager.com/gtag/js?id={tracking_id}";
+            parentDoc.head.appendChild(gaScript);
+
+            // 2. 구글 애널리틱스 실행 설정
+            var gaInline = parentDoc.createElement("script");
+            gaInline.innerHTML = `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){{dataLayer.push(arguments);}}
+                gtag('js', new Date());
+                gtag('config', '{tracking_id}');
+            `;
+            parentDoc.head.appendChild(gaInline);
+        }}
+    </script>
+    """
+    # 보이지 않는 투명 상자에서 스크립트를 딱 한 번 실행시킵니다.
+    components.html(ga_js, width=0, height=0)
 
 # ==========================================
 # 🎨 스마트폰 화면 비율 강제 적용 (Custom CSS)
@@ -142,7 +147,7 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
 # ==========================================
 st.set_page_config(page_title="AI 로또 예측기", page_icon="🎲")
 
-# 🚀 기존 코드를 지우고, 새로 만든 해킹 함수로 변경합니다!
+# 🚀 본인의 측정 ID를 다시 넣어주세요!
 inject_ga("G-X29DQR6BSL")
 
 apply_mobile_layout()
