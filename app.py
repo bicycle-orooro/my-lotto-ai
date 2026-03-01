@@ -110,7 +110,8 @@ def get_lotto_ball_html(number):
 # ==========================================
 # 📊 데이터 로드
 # ==========================================
-@st.cache_data
+#@st.cache_data
+@st.cache_data(ttl=600)
 def load_data():
     if not os.path.exists(CSV_FILE):
         return pd.DataFrame()
@@ -322,3 +323,4 @@ if not df.empty:
         st.dataframe(df, use_container_width=True)
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
+
