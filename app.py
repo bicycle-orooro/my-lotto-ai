@@ -109,21 +109,22 @@ def get_lotto_ball_html(number):
     return f'<div class="lotto-ball" style="background-color: {bg_color}; color: {text_color};">{number}</div>'
 
 # ==========================================
-# 📊 데이터 로드
+# 📊 데이터 로드 (보너스 번호 추가!)
 # ==========================================
 @st.cache_data(ttl=600)
 def load_data():
     if not os.path.exists(CSV_FILE):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(CSV_FILE, header=None, names=['draw_no', 'num1', 'num2', 'num3', 'num4', 'num5', 'num6'])
+        # 🎯 8번째 칸 'bonus' 추가
+        df = pd.read_csv(CSV_FILE, header=None, names=['draw_no', 'num1', 'num2', 'num3', 'num4', 'num5', 'num6', 'bonus'])
         df = df.apply(pd.to_numeric, errors='coerce').dropna().astype(int)
         return df
     except:
         return pd.DataFrame()
 
 # ==========================================
-# 🤖 AI 기반 예측 알고리즘
+# 🤖 AI 기반 예측 알고리즘 (통계는 기존 당첨 6개 번호 기준 유지)
 # ==========================================
 def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
     if df.empty: return [[1, 2, 3, 4, 5, 6] for _ in range(num_sets)]
@@ -298,25 +299,24 @@ if not df.empty:
             st.dataframe(df, use_container_width=True)
 
     # ----------------------------------------
-    # [탭 2] 🌟 당첨 확인 화면 (카메라 선택 기능 추가!)
+    # [탭 2] 🌟 당첨 확인 (보너스 번호 및 2등 판별 로직 적용)
     # ----------------------------------------
     with tab2:
-        st.write("") # 탭 이름과 살짝 여백 주기
+        st.write("") 
         
-        # 🎯 핵심: 사용자가 방식을 선택하게 만드는 스위치! (기본값은 '수동 입력'으로 해서 카메라가 바로 안 켜지게 함)
         check_method = st.radio(
             "🔍 확인 방식을 선택해 주세요:",
             ("⌨️ 수동으로 번호 입력", "📷 QR 코드로 스캔 (카메라 켜기)"),
             horizontal=True
         )
         
-        # [모드 1] QR 코드로 스캔을 선택했을 때만 카메라 켜기
+        # [모드 1] QR 코드로 스캔
         if check_method == "📷 QR 코드로 스캔 (카메라 켜기)":
             with st.container(border=True):
                 st.subheader("📷 QR 코드로 스캔하기")
                 st.caption("스마트폰 카메라로 영수증 우측 상단의 QR 코드를 비춰주세요.")
                 st.info("💡 **Tip:** 내 얼굴이 보인다면? 카메라 화면 안의 **🔄(전환) 버튼**을 눌러 후면 카메라로 변경해 주세요!")
-                # 여기서 비로소 카메라가 켜집니다!
+                
                 img_file_buffer = st.camera_input("QR 코드 스캔")
 
                 if img_file_buffer is not None:
@@ -341,33 +341,40 @@ if not df.empty:
                                     st.warning(f"😅 {qr_draw_no}회차 당첨 번호가 아직 우리 데이터베이스에 업데이트되지 않았습니다.")
                                 else:
                                     win_nums = target_draw_data.iloc[0][['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].tolist()
+                                    bonus_num = target_draw_data.iloc[0]['bonus'] # 🎯 보너스 번호 추출
                                     
                                     st.write("---")
                                     st.write(f"### 🎯 {qr_draw_no}회차 당첨 결과")
                                     win_html = "".join([get_lotto_ball_html(num) for num in win_nums])
-                                    st.markdown(f"**실제 당첨 번호:**<br>{win_html}", unsafe_allow_html=True)
+                                    
+                                    # 🎯 실제 당첨번호 옆에 보너스 번호를 플러스(+) 기호와 함께 예쁘게 표시
+                                    st.markdown(f"**실제 당첨 번호:**<br>{win_html} <span style='font-size: 20px; font-weight: bold;'>➕</span> {get_lotto_ball_html(bonus_num)}", unsafe_allow_html=True)
                                     st.write("")
                                     
                                     games = [c for c in chunks[1:] if len(c) == 12] 
                                     for idx, game_str in enumerate(games):
                                         my_nums = [int(game_str[i:i+2]) for i in range(0, 12, 2)]
                                         match_count = len(set(my_nums) & set(win_nums))
+                                        has_bonus = bonus_num in my_nums # 🎯 내 번호에 보너스 번호가 있는지 확인
                                         
                                         my_html = ""
                                         for num in sorted(my_nums):
                                             if num in win_nums:
-                                                my_html += get_lotto_ball_html(num)
+                                                my_html += get_lotto_ball_html(num) # 6개 당첨 번호 일치 시 (원래 색)
+                                            elif num == bonus_num:
+                                                my_html += get_lotto_ball_html(num) # 보너스 번호 일치 시 (원래 색)
                                             else:
-                                                my_html += f'<div class="lotto-ball" style="background-color: #333333; color: gray;">{num}</div>'
+                                                my_html += f'<div class="lotto-ball" style="background-color: #333333; color: gray;">{num}</div>' # 꽝 번호
                                         
+                                        # 🎯 2등, 3등 완벽 분리 로직 적용!
                                         result_text = "꽝 😢"
                                         if match_count == 6: result_text = "1등 🎉"
-                                        elif match_count == 5: result_text = "3등(또는 2등) 🎊"
+                                        elif match_count == 5 and has_bonus: result_text = "2등 🎊 (보너스 일치)"
+                                        elif match_count == 5: result_text = "3등 🎊"
                                         elif match_count == 4: result_text = "4등 👍"
                                         elif match_count == 3: result_text = "5등 💰"
                                         
                                         st.markdown(f"**{chr(65+idx)} 게임 [{result_text}]**<br>{my_html}", unsafe_allow_html=True)
-                                    st.caption("※ 현재 보너스 번호 미제공으로 2등과 3등을 구분하지 않습니다.")
                             except:
                                 st.error("QR 코드는 읽었지만, 동행복권 형식을 해독할 수 없습니다.")
                         else:
@@ -375,7 +382,7 @@ if not df.empty:
                     else:
                         st.warning("QR 코드를 찾지 못했습니다. 조금 더 밝은 곳에서 초점을 맞춰서 다시 찍어주세요!")
 
-        # [모드 2] 수동 입력을 선택했을 때 (기본 화면)
+        # [모드 2] 수동 입력
         else:
             with st.container(border=True):
                 st.subheader("⌨️ 수동으로 번호 확인하기")
@@ -400,27 +407,41 @@ if not df.empty:
                                     st.error("해당 회차의 데이터가 없습니다.")
                                 else:
                                     win_nums = target_draw_data.iloc[0][['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].tolist()
+                                    bonus_num = target_draw_data.iloc[0]['bonus'] # 🎯 보너스 번호 추출
                                     match_count = len(set(my_nums) & set(win_nums))
+                                    has_bonus = bonus_num in my_nums # 🎯 보너스 번호 보유 여부
                                     
                                     st.write("---")
                                     st.subheader(f"✅ {check_draw}회차 결과")
+                                    
                                     st.caption("실제 당첨 번호")
                                     win_html = "".join([get_lotto_ball_html(num) for num in win_nums])
-                                    st.markdown(win_html, unsafe_allow_html=True)
+                                    st.markdown(f"{win_html} <span style='font-size: 20px; font-weight: bold;'>➕</span> {get_lotto_ball_html(bonus_num)}", unsafe_allow_html=True)
                                     
                                     st.caption("내가 입력한 번호")
                                     my_html = ""
                                     for num in sorted(my_nums):
                                         if num in win_nums: my_html += get_lotto_ball_html(num) 
+                                        elif num == bonus_num: my_html += get_lotto_ball_html(num)
                                         else: my_html += f'<div class="lotto-ball" style="background-color: #333333; color: gray;">{num}</div>'
                                     st.markdown(my_html, unsafe_allow_html=True)
                                     
                                     st.write("---")
-                                    if match_count == 6: st.success("🎉 미쳤습니다!! 1등 당첨입니다!! (6개 일치)"); st.balloons()
-                                    elif match_count == 5: st.success("🎉 대박! 3등 (또는 2등) 당첨입니다! (5개 일치)")
-                                    elif match_count == 4: st.info("👍 4등 당첨입니다! (4개 일치)")
-                                    elif match_count == 3: st.info("💰 5등 당첨입니다! (3개 일치 - 5,000원)")
-                                    else: st.error(f"😢 아쉽습니다. 꽝입니다. (맞춘 개수: {match_count}개)")
+                                    # 🎯 2등과 3등 완벽 판별 추가!
+                                    if match_count == 6: 
+                                        st.success("🎉 미쳤습니다!! 1등 당첨입니다!! (6개 일치)")
+                                        st.balloons()
+                                    elif match_count == 5 and has_bonus: 
+                                        st.success("🎉 엄청난 행운입니다!! 2등 당첨입니다!! (5개 일치 + 보너스 번호 일치)")
+                                        st.balloons()
+                                    elif match_count == 5: 
+                                        st.success("🎉 축하합니다! 3등 당첨입니다! (5개 일치)")
+                                    elif match_count == 4: 
+                                        st.info("👍 4등 당첨입니다! (4개 일치)")
+                                    elif match_count == 3: 
+                                        st.info("💰 5등 당첨입니다! (3개 일치 - 5,000원)")
+                                    else: 
+                                        st.error(f"😢 아쉽습니다. 꽝입니다. (맞춘 개수: {match_count}개)")
                         except ValueError:
                             st.error("숫자와 쉼표(,)만 정확하게 입력해 주세요!")
 else:
