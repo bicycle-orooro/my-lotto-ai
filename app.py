@@ -315,7 +315,7 @@ if not df.empty:
             with st.container(border=True):
                 st.subheader("📷 QR 코드로 스캔하기")
                 st.caption("스마트폰 카메라로 영수증 우측 상단의 QR 코드를 비춰주세요.")
-                
+                st.info("💡 **Tip:** 내 얼굴이 보인다면? 카메라 화면 안의 **🔄(전환) 버튼**을 눌러 후면 카메라로 변경해 주세요!")
                 # 여기서 비로소 카메라가 켜집니다!
                 img_file_buffer = st.camera_input("QR 코드 스캔")
 
