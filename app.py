@@ -3,7 +3,11 @@ import streamlit as st
 import random
 import os
 import streamlit.components.v1 as components 
-import altair as alt # 🎯 줌(Zoom) 방지를 위한 고급 차트 라이브러리 추가!
+import altair as alt 
+import re 
+import cv2 
+import numpy as np
+from PIL import Image
 
 CSV_FILE = "lotto_data.csv"
 
@@ -73,19 +77,21 @@ def apply_mobile_layout():
             box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
-        [data-testid="stMetricValue"] {
-            font-size: 20px !important; 
-            font-weight: 700 !important;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 12px !important; 
-        }
+        [data-testid="stMetricValue"] { font-size: 20px !important; font-weight: 700 !important; }
+        [data-testid="stMetricLabel"] { font-size: 12px !important; }
         
         .stButton>button {
             border-radius: 10px;
             font-weight: bold;
             font-size: 16px;
             padding: 10px;
+        }
+        
+        button[data-baseweb="tab"] {
+            font-size: 16px !important;
+            font-weight: bold !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
         }
         
         header {visibility: hidden;}
@@ -95,22 +101,16 @@ def apply_mobile_layout():
     )
 
 def get_lotto_ball_html(number):
-    if number <= 10:
-        bg_color = "#fbc400"; text_color = "black"
-    elif number <= 20:
-        bg_color = "#69c8f2"; text_color = "black"
-    elif number <= 30:
-        bg_color = "#ff7272"; text_color = "white"
-    elif number <= 40:
-        bg_color = "#aaaaaa"; text_color = "white"
-    else:
-        bg_color = "#b0d840"; text_color = "black"
+    if number <= 10: bg_color = "#fbc400"; text_color = "black"
+    elif number <= 20: bg_color = "#69c8f2"; text_color = "black"
+    elif number <= 30: bg_color = "#ff7272"; text_color = "white"
+    elif number <= 40: bg_color = "#aaaaaa"; text_color = "white"
+    else: bg_color = "#b0d840"; text_color = "black"
     return f'<div class="lotto-ball" style="background-color: {bg_color}; color: {text_color};">{number}</div>'
 
 # ==========================================
 # 📊 데이터 로드
 # ==========================================
-#@st.cache_data
 @st.cache_data(ttl=600)
 def load_data():
     if not os.path.exists(CSV_FILE):
@@ -126,9 +126,7 @@ def load_data():
 # 🤖 AI 기반 예측 알고리즘
 # ==========================================
 def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
-    if df.empty:
-        return [[1, 2, 3, 4, 5, 6] for _ in range(num_sets)]
-        
+    if df.empty: return [[1, 2, 3, 4, 5, 6] for _ in range(num_sets)]
     all_nums = df[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].values.flatten()
     recent_nums = df.head(10)[['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].values.flatten()
     
@@ -136,7 +134,6 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
     recent_counts = pd.Series(recent_nums).value_counts()
     
     weights = {i: 1.0 for i in range(1, 46)}
-    
     for num in range(1, 46):
         if num in all_counts: weights[num] += all_counts[num] * 0.02
         if num in recent_counts: weights[num] += recent_counts[num] * 0.5
@@ -152,16 +149,13 @@ def generate_ai_numbers(df, num_sets=5, fixed_nums=[], excluded_nums=[]):
             if pick not in selected: selected.append(pick)
         selected.sort() 
         generated_sets.append(selected)
-        
     return generated_sets
 
 # ==========================================
 # 📊 통계 분석 풀세트 
 # ==========================================
 def show_statistics_dashboard(df):
-
     st.header("📊 로또 데이터 분석 리포트")
-
     if df.empty:
         st.warning("데이터가 없습니다.")
         return
@@ -210,7 +204,6 @@ def show_statistics_dashboard(df):
         """
         st.markdown(metrics_html, unsafe_allow_html=True)
 
-    # 🎯 수정 1: 구간별 분포 차트를 Altair로 변경 (줌/스크롤 방지)
     with st.container(border=True):
         st.subheader("📈 구간별 출현 분포")
         bins = {"1~10": 0, "11~20": 0, "21~30": 0, "31~40": 0, "41~45": 0}
@@ -227,13 +220,10 @@ def show_statistics_dashboard(df):
             y=alt.Y('출현 횟수', title=None),
             tooltip=['구간', '출현 횟수']
         ).properties(height=200)
-        st.altair_chart(bar_chart, use_container_width=True) # 기본적으로 확대/축소 불가능!
+        st.altair_chart(bar_chart, use_container_width=True)
 
-    # 🎯 수정 2: 합계 라인 차트도 Altair로 변경 (가로축에 정확한 회차 이름 표시 보너스!)
     with st.container(border=True):
         st.subheader("➕ 최근 10회 합계 흐름")
-        
-        # 최근 10회차를 시간순(과거->현재)으로 정렬하여 차트 데이터 생성
         df_sums = pd.DataFrame({
             "회차": recent['draw_no'].astype(str) + "회",
             "합계": sums.values
@@ -246,33 +236,13 @@ def show_statistics_dashboard(df):
         ).properties(height=200)
         st.altair_chart(line_chart, use_container_width=True)
 
-    with st.container(border=True):
-        st.subheader("🎯 연속번호 및 AI 신뢰도")
-        consecutive_count = 0
-        for _, row in recent.iterrows():
-            nums = sorted(row[['num1','num2','num3','num4','num5','num6']])
-            for i in range(5):
-                if nums[i] + 1 == nums[i+1]:
-                    consecutive_count += 1
-                    break
-
-        rate = (consecutive_count / len(recent)) * 100
-        confidence = min(90, 50 + int(rate / 2) + len(hot))
-        
-        st.metric("10회 연속번호 출현", f"{round(rate,1)}%")
-        st.progress(confidence / 100)
-        st.caption(f"통계 가중치 기반 AI 분석 신뢰도 {confidence}%")
-
 # ==========================================
 # 🖥️ 메인 웹 화면 구성
 # ==========================================
 inject_ga("G-X29DQR6BSL")
-
 apply_mobile_layout()
 
-with st.container(border=True):
-    st.title("🎲 AI 로또 예측 앱")
-    st.write("빅데이터 통계와 나의 직감을 조합해 보세요!")
+st.title("🎲 AI 로또 예측 앱")
 
 df = load_data()
 
@@ -280,47 +250,178 @@ if not df.empty:
     latest_draw = df['draw_no'].iloc[0]
     next_draw = latest_draw + 1 
     
-    st.info(f"✅ **{latest_draw}회차** 데이터 학습 완료 (다음: **{next_draw}회차**)")
+    tab1, tab2 = st.tabs(["🔮 번호 예측 & 통계", "🏆 내 번호 당첨 확인"])
     
-    with st.container(border=True):
-        with st.expander("🛠️ 나만의 번호 설정 (고정수/제외수)"):
-            all_numbers = list(range(1, 46))
-            fixed_nums = st.multiselect("📌 무조건 포함할 번호 (최대 5개)", all_numbers, max_selections=5)
-            excluded_nums = st.multiselect("❌ 절대 안 나올 번호", all_numbers)
-            
-            intersect = set(fixed_nums) & set(excluded_nums)
-            if intersect:
-                st.error(f"⚠️ 중복 번호가 있습니다: {', '.join(map(str, intersect))}")
-
-    if st.button("✨ AI 번호 5세트 생성하기", type="primary", use_container_width=True):
-        if intersect:
-            st.warning("고정수와 제외수 충돌을 먼저 해결해 주세요!")
-        else:
-            with st.spinner('최적의 조합을 계산 중입니다...'):
-                ai_sets = generate_ai_numbers(df, num_sets=5, fixed_nums=fixed_nums, excluded_nums=excluded_nums)
+    # ----------------------------------------
+    # [탭 1] 기존 예측 및 통계 화면
+    # ----------------------------------------
+    with tab1:
+        st.info(f"✅ **{latest_draw}회차** 데이터 학습 완료 (다음: **{next_draw}회차**)")
+        
+        with st.container(border=True):
+            with st.expander("🛠️ 나만의 번호 설정 (고정수/제외수)"):
+                all_numbers = list(range(1, 46))
+                fixed_nums = st.multiselect("📌 무조건 포함할 번호 (최대 5개)", all_numbers, max_selections=5)
+                excluded_nums = st.multiselect("❌ 절대 안 나올 번호", all_numbers)
                 
-                with st.container(border=True):
-                    st.subheader("🎯 AI 추천 번호")
-                    share_text = f"🤖 AI 로또 추천 번호 ({next_draw}회차)\n\n"
-                    
-                    for i, num_set in enumerate(ai_sets):
-                        st.caption(f"**추천 세트 {i+1}**")
-                        balls_html = "".join([get_lotto_ball_html(num) for num in num_set])
-                        st.markdown(f'<div style="margin-bottom: 12px;">{balls_html}</div>', unsafe_allow_html=True)
-                        share_text += f"세트 {i+1} : {', '.join(map(str, num_set))}\n"
-                    
-                    share_text += "\n무료로 나만의 AI 번호 뽑기!\n👉 https://bicycle-orooro.github.io/my-lotto-ai/"
-                    
-                    st.write("---")
-                    st.write("📲 **번호 공유하기**")
-                    st.code(share_text, language="text")
+                intersect = set(fixed_nums) & set(excluded_nums)
+                if intersect:
+                    st.error(f"⚠️ 중복 번호가 있습니다: {', '.join(map(str, intersect))}")
 
-    st.write("---")
-    
-    show_statistics_dashboard(df)
-    
-    with st.expander("📊 과거 당첨 번호 데이터베이스 확인"):
-        st.dataframe(df, use_container_width=True)
+        if st.button("✨ AI 번호 5세트 생성하기", type="primary", use_container_width=True):
+            if intersect:
+                st.warning("고정수와 제외수 충돌을 먼저 해결해 주세요!")
+            else:
+                with st.spinner('최적의 조합을 계산 중입니다...'):
+                    ai_sets = generate_ai_numbers(df, num_sets=5, fixed_nums=fixed_nums, excluded_nums=excluded_nums)
+                    
+                    with st.container(border=True):
+                        st.subheader("🎯 AI 추천 번호")
+                        share_text = f"🤖 AI 로또 추천 번호 ({next_draw}회차)\n\n"
+                        
+                        for i, num_set in enumerate(ai_sets):
+                            st.caption(f"**추천 세트 {i+1}**")
+                            balls_html = "".join([get_lotto_ball_html(num) for num in num_set])
+                            st.markdown(f'<div style="margin-bottom: 12px;">{balls_html}</div>', unsafe_allow_html=True)
+                            share_text += f"세트 {i+1} : {', '.join(map(str, num_set))}\n"
+                        
+                        share_text += "\n무료로 나만의 AI 번호 뽑기!\n👉 https://bicycle-orooro.github.io/my-lotto-ai/"
+                        
+                        st.write("---")
+                        st.write("📲 **번호 공유하기**")
+                        st.code(share_text, language="text")
+
+        st.write("---")
+        show_statistics_dashboard(df)
+        
+        with st.expander("📊 과거 당첨 번호 데이터베이스 확인"):
+            st.dataframe(df, use_container_width=True)
+
+    # ----------------------------------------
+    # [탭 2] 🌟 당첨 확인 화면 (카메라 선택 기능 추가!)
+    # ----------------------------------------
+    with tab2:
+        st.write("") # 탭 이름과 살짝 여백 주기
+        
+        # 🎯 핵심: 사용자가 방식을 선택하게 만드는 스위치! (기본값은 '수동 입력'으로 해서 카메라가 바로 안 켜지게 함)
+        check_method = st.radio(
+            "🔍 확인 방식을 선택해 주세요:",
+            ("⌨️ 수동으로 번호 입력", "📷 QR 코드로 스캔 (카메라 켜기)"),
+            horizontal=True
+        )
+        
+        # [모드 1] QR 코드로 스캔을 선택했을 때만 카메라 켜기
+        if check_method == "📷 QR 코드로 스캔 (카메라 켜기)":
+            with st.container(border=True):
+                st.subheader("📷 QR 코드로 스캔하기")
+                st.caption("스마트폰 카메라로 영수증 우측 상단의 QR 코드를 비춰주세요.")
+                
+                # 여기서 비로소 카메라가 켜집니다!
+                img_file_buffer = st.camera_input("QR 코드 스캔")
+
+                if img_file_buffer is not None:
+                    image = Image.open(img_file_buffer)
+                    img_array = np.array(image)
+                    
+                    detector = cv2.QRCodeDetector()
+                    qr_data, bbox, _ = detector.detectAndDecode(img_array)
+                    
+                    if qr_data:
+                        if "v=" in qr_data:
+                            v_string = qr_data.split("v=")[1]
+                            chunks = re.split(r'[mq]', v_string) 
+                            
+                            try:
+                                qr_draw_no = int(chunks[0])
+                                target_draw_data = df[df['draw_no'] == qr_draw_no]
+                                
+                                st.success(f"✅ QR 스캔 성공! ({qr_draw_no}회차)")
+                                
+                                if target_draw_data.empty:
+                                    st.warning(f"😅 {qr_draw_no}회차 당첨 번호가 아직 우리 데이터베이스에 업데이트되지 않았습니다.")
+                                else:
+                                    win_nums = target_draw_data.iloc[0][['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].tolist()
+                                    
+                                    st.write("---")
+                                    st.write(f"### 🎯 {qr_draw_no}회차 당첨 결과")
+                                    win_html = "".join([get_lotto_ball_html(num) for num in win_nums])
+                                    st.markdown(f"**실제 당첨 번호:**<br>{win_html}", unsafe_allow_html=True)
+                                    st.write("")
+                                    
+                                    games = [c for c in chunks[1:] if len(c) == 12] 
+                                    for idx, game_str in enumerate(games):
+                                        my_nums = [int(game_str[i:i+2]) for i in range(0, 12, 2)]
+                                        match_count = len(set(my_nums) & set(win_nums))
+                                        
+                                        my_html = ""
+                                        for num in sorted(my_nums):
+                                            if num in win_nums:
+                                                my_html += get_lotto_ball_html(num)
+                                            else:
+                                                my_html += f'<div class="lotto-ball" style="background-color: #333333; color: gray;">{num}</div>'
+                                        
+                                        result_text = "꽝 😢"
+                                        if match_count == 6: result_text = "1등 🎉"
+                                        elif match_count == 5: result_text = "3등(또는 2등) 🎊"
+                                        elif match_count == 4: result_text = "4등 👍"
+                                        elif match_count == 3: result_text = "5등 💰"
+                                        
+                                        st.markdown(f"**{chr(65+idx)} 게임 [{result_text}]**<br>{my_html}", unsafe_allow_html=True)
+                                    st.caption("※ 현재 보너스 번호 미제공으로 2등과 3등을 구분하지 않습니다.")
+                            except:
+                                st.error("QR 코드는 읽었지만, 동행복권 형식을 해독할 수 없습니다.")
+                        else:
+                            st.error("동행복권 영수증 QR 코드가 아닙니다.")
+                    else:
+                        st.warning("QR 코드를 찾지 못했습니다. 조금 더 밝은 곳에서 초점을 맞춰서 다시 찍어주세요!")
+
+        # [모드 2] 수동 입력을 선택했을 때 (기본 화면)
+        else:
+            with st.container(border=True):
+                st.subheader("⌨️ 수동으로 번호 확인하기")
+                check_draw = st.number_input("📌 확인하실 회차를 입력하세요", min_value=1, max_value=latest_draw, value=latest_draw)
+                user_input = st.text_input("예시: 7, 14, 20, 33, 38, 45", placeholder="번호 6개를 입력해 주세요")
+                
+                if st.button("결과 확인하기", type="primary", use_container_width=True):
+                    if not user_input:
+                        st.warning("번호를 입력해 주세요!")
+                    else:
+                        try:
+                            my_nums = [int(x.strip()) for x in user_input.split(',')]
+                            if len(my_nums) != 6:
+                                st.error(f"번호를 정확히 6개 입력해 주세요. (현재 {len(my_nums)}개 입력됨)")
+                            elif len(set(my_nums)) != 6:
+                                st.error("중복된 번호가 있습니다!")
+                            elif any(n < 1 or n > 45 for n in my_nums):
+                                st.error("번호는 1부터 45 사이여야 합니다!")
+                            else:
+                                target_draw_data = df[df['draw_no'] == check_draw]
+                                if target_draw_data.empty:
+                                    st.error("해당 회차의 데이터가 없습니다.")
+                                else:
+                                    win_nums = target_draw_data.iloc[0][['num1', 'num2', 'num3', 'num4', 'num5', 'num6']].tolist()
+                                    match_count = len(set(my_nums) & set(win_nums))
+                                    
+                                    st.write("---")
+                                    st.subheader(f"✅ {check_draw}회차 결과")
+                                    st.caption("실제 당첨 번호")
+                                    win_html = "".join([get_lotto_ball_html(num) for num in win_nums])
+                                    st.markdown(win_html, unsafe_allow_html=True)
+                                    
+                                    st.caption("내가 입력한 번호")
+                                    my_html = ""
+                                    for num in sorted(my_nums):
+                                        if num in win_nums: my_html += get_lotto_ball_html(num) 
+                                        else: my_html += f'<div class="lotto-ball" style="background-color: #333333; color: gray;">{num}</div>'
+                                    st.markdown(my_html, unsafe_allow_html=True)
+                                    
+                                    st.write("---")
+                                    if match_count == 6: st.success("🎉 미쳤습니다!! 1등 당첨입니다!! (6개 일치)"); st.balloons()
+                                    elif match_count == 5: st.success("🎉 대박! 3등 (또는 2등) 당첨입니다! (5개 일치)")
+                                    elif match_count == 4: st.info("👍 4등 당첨입니다! (4개 일치)")
+                                    elif match_count == 3: st.info("💰 5등 당첨입니다! (3개 일치 - 5,000원)")
+                                    else: st.error(f"😢 아쉽습니다. 꽝입니다. (맞춘 개수: {match_count}개)")
+                        except ValueError:
+                            st.error("숫자와 쉼표(,)만 정확하게 입력해 주세요!")
 else:
     st.error("데이터 파일을 찾을 수 없습니다.")
-
