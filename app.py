@@ -240,7 +240,7 @@ def show_statistics_dashboard(df):
 # ==========================================
 # 🖥️ 메인 웹 화면 구성
 # ==========================================
-inject_ga("G-X29DQR6BSL")
+inject_ga("G-000000000")
 apply_mobile_layout()
 
 st.title("🎲 AI 로또 예측 앱")
